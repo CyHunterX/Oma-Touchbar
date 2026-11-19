@@ -15,7 +15,7 @@ pub const DEFAULT_PATH: &str = "/etc/touchbar-daemon/config.toml";
 /// Used when no config file exists; also installed as the example config.
 pub const DEFAULT_CONFIG: &str = include_str!("../data/config.toml");
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
@@ -24,7 +24,7 @@ pub struct Config {
     pub layers: Vec<Layer>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields, default)]
 pub struct General {
     /// Layer shown when nothing else is active.
@@ -72,14 +72,14 @@ impl Default for General {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Layer {
     pub name: String,
     pub buttons: Vec<Button>,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Deserialize, Debug, Clone, Default, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Button {
     pub label: Option<String>,
@@ -215,6 +215,154 @@ impl Config {
     }
 }
 
+impl Config {
+    /// Checks the config without loading it from a file.
+    pub fn check(&self) -> Result<()> {
+        self.validate()
+    }
+
+    /// Writes the config as TOML, one inline table per button.
+    pub fn to_toml(&self) -> String {
+        let g = &self.general;
+        let d = General::default();
+        let mut out = String::from(
+            "# Oma Touchbar configuration, written by the settings app.\n\
+             # Every option is documented in `touchbar-daemon --print-default-config`.\n\n\
+             [general]\n",
+        );
+        let mut line = |k: &str, v: String| out += &format!("{k} = {v}\n");
+        line("default_layer", quote(&g.default_layer));
+        line("fn_layer", quote(&g.fn_layer));
+        line("outlines", g.outlines.to_string());
+        line("font", quote(&g.font));
+        line("font_size", g.font_size.to_string());
+        line("icon_size", g.icon_size.to_string());
+        line("dim_after", g.dim_after.to_string());
+        line("off_after", g.off_after.to_string());
+        line("collapse_after", g.collapse_after.to_string());
+        // Only write the hardware fixes when they are needed.
+        if g.esc_button != d.esc_button {
+            line("esc_button", g.esc_button.to_string());
+        }
+        if g.flip_touch != d.flip_touch {
+            line("flip_touch", g.flip_touch.to_string());
+        }
+        if g.flip_display != d.flip_display {
+            line("flip_display", g.flip_display.to_string());
+        }
+        for layer in &self.layers {
+            out += &format!("\n[[layer]]\nname = {}\nbuttons = [\n", quote(&layer.name));
+            for b in &layer.buttons {
+                out += &format!("    {},\n", b.to_toml());
+            }
+            out += "]\n";
+        }
+        out
+    }
+
+    /// A layer name not used yet, starting from `base`.
+    pub fn unused_layer_name(&self, base: &str) -> String {
+        (1..)
+            .map(|n| if n == 1 { base.to_string() } else { format!("{base}-{n}") })
+            .find(|name| self.layer(name).is_none())
+            .unwrap()
+    }
+
+    /// Whether any button opens or switches to `layer`.
+    pub fn is_referenced(&self, layer: &str) -> bool {
+        self.layers.iter().flat_map(|l| &l.buttons).any(|b| {
+            b.open.as_deref() == Some(layer) || b.switch.as_deref() == Some(layer)
+        })
+    }
+}
+
+impl Button {
+    fn to_toml(&self) -> String {
+        let mut parts = Vec::new();
+        let text = |parts: &mut Vec<String>, k: &str, v: &Option<String>| {
+            if let Some(v) = v {
+                parts.push(format!("{k} = {}", quote(v)));
+            }
+        };
+        text(&mut parts, "label", &self.label);
+        text(&mut parts, "icon", &self.icon);
+        text(&mut parts, "clock", &self.clock);
+        text(&mut parts, "battery", &self.battery);
+        match self.key.as_slice() {
+            [] => {}
+            [one] => parts.push(format!("key = {}", quote(one))),
+            many => parts.push(format!(
+                "key = [{}]",
+                many.iter().map(|k| quote(k)).collect::<Vec<_>>().join(", ")
+            )),
+        }
+        text(&mut parts, "open", &self.open);
+        text(&mut parts, "switch", &self.switch);
+        if let Some(w) = self.width {
+            parts.push(format!("width = {w}"));
+        }
+        if let Some(t) = self.tint {
+            parts.push(format!("tint = {t}"));
+        }
+        if parts.is_empty() {
+            "{}".into()
+        } else {
+            format!("{{ {} }}", parts.join(", "))
+        }
+    }
+}
+
+fn quote(s: &str) -> String {
+    toml::Value::String(s.to_owned()).to_string()
+}
+
+/// Every key name the daemon accepts, in a friendly spelling (`VolumeUp`).
+pub fn key_names() -> Vec<String> {
+    (1..0x100u16)
+        .chain(0x160..0x2ff)
+        .filter_map(|code| {
+            let debug = format!("{:?}", KeyCode::new(code));
+            let short = debug.strip_prefix("KEY_")?;
+            Some(friendly(short))
+        })
+        .collect()
+}
+
+/// Spells a kernel key name the way the example config does:
+/// VOLUMEUP -> VolumeUp, KBDILLUMDOWN -> KbdIllumDown, LEFTCTRL -> LeftCtrl.
+fn friendly(upper: &str) -> String {
+    const WORDS: &[&str] = &[
+        "BRIGHTNESS", "BACKSPACE", "PREVIOUS", "FORWARD", "CONTROL", "DISPLAY", "PROGRAM",
+        "CONFIG", "VOLUME", "SEARCH", "SCREEN", "REWIND", "RECORD", "INSERT", "DELETE",
+        "SCROLL", "SWITCH", "CAMERA", "BATTERY", "TOGGLE", "PAUSE", "PRINT", "SPACE", "ENTER",
+        "ILLUM", "RIGHT", "SLEEP", "POWER", "CLOSE", "CYCLE", "SHIFT", "MEDIA", "SOUND", "PHONE",
+        "LEFT", "CTRL", "META", "PLAY", "NEXT", "SONG", "MUTE", "DOWN", "PAGE", "HOME", "LOCK",
+        "STOP", "MENU", "BACK", "FIND", "COPY", "UNDO", "REDO", "HELP", "ZOOM", "FILE", "MAIL",
+        "CALC", "TIME", "AUTO", "FAST", "EJECT", "WAKE", "OPEN", "SEND", "CUT", "ALT", "TAB",
+        "END", "KBD", "MIC", "OFF", "WWW", "OUT", "UP", "IN", "CD", "ON",
+    ];
+    let mut out = String::new();
+    let mut rest = upper;
+    while !rest.is_empty() {
+        if let Some(word) = WORDS.iter().find(|w| rest.starts_with(**w)) {
+            out += &word[..1];
+            out += &word[1..].to_ascii_lowercase();
+            rest = &rest[word.len()..];
+        } else {
+            // Digits and unknown letters: keep the first capital, lower the rest.
+            let c = rest.chars().next().unwrap();
+            let starts_word = out.chars().last().is_none_or(|p| p.is_ascii_digit() || p == '_');
+            if starts_word || c.is_ascii_digit() {
+                out.push(c);
+            } else {
+                out.push(c.to_ascii_lowercase());
+            }
+            rest = &rest[c.len_utf8()..];
+        }
+    }
+    out
+}
+
 /// Resolves a key name. Accepts kernel names with or without the `KEY_`
 /// prefix, in any case and with or without underscores: `VolumeUp`,
 /// `volume_up` and `KEY_VOLUMEUP` are the same key.
@@ -254,6 +402,32 @@ mod tests {
     #[test]
     fn default_config_is_valid() {
         Config::parse(DEFAULT_CONFIG).unwrap();
+    }
+
+    #[test]
+    fn round_trips_through_toml() {
+        let mut config = Config::parse(DEFAULT_CONFIG).unwrap();
+        config.general.flip_touch = true;
+        config.layers[0].buttons.push(Button {
+            label: Some("say \"hi\"".into()),
+            key: vec!["LeftCtrl".into(), "C".into()],
+            width: Some(2),
+            tint: Some(false),
+            ..Default::default()
+        });
+        config.layers[0].buttons.push(Button::default());
+        let text = config.to_toml();
+        assert_eq!(Config::parse(&text).unwrap(), config);
+    }
+
+    #[test]
+    fn listed_key_names_parse() {
+        let names = super::key_names();
+        assert!(names.len() > 200);
+        assert!(names.iter().all(|n| parse_key(n).is_some()));
+        for want in ["VolumeUp", "KbdIllumDown", "LeftCtrl", "PlayPause", "PreviousSong", "BrightnessDown", "F12", "Esc"] {
+            assert!(names.iter().any(|n| n == want), "{want} missing");
+        }
     }
 
     #[test]

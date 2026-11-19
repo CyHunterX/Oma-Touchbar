@@ -143,6 +143,26 @@ impl Icons {
         surface
     }
 
+    /// Names of the icons the daemon can find by name, sorted, with
+    /// monochrome "-symbolic" icons first since they suit the bar best.
+    pub fn names(&mut self) -> Vec<String> {
+        let mut names: Vec<String> = self.theme_index.get_or_insert_with(index_themes).keys().cloned().collect();
+        for dir in ICON_DIRS {
+            if let Ok(entries) = fs::read_dir(dir) {
+                names.extend(entries.flatten().filter_map(|e| {
+                    let p = e.path();
+                    matches!(p.extension()?.to_str()?, "svg" | "png")
+                        .then(|| p.file_stem()?.to_str().map(String::from))?
+                }));
+            }
+        }
+        names.sort_by(|a, b| {
+            (!a.ends_with("-symbolic"), a).cmp(&(!b.ends_with("-symbolic"), b))
+        });
+        names.dedup();
+        names
+    }
+
     fn find(&mut self, name: &str) -> Option<PathBuf> {
         let path = Path::new(name);
         if path.is_absolute() {

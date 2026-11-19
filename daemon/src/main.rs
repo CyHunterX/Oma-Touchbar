@@ -1,12 +1,9 @@
-mod config;
 mod display;
 mod input;
-mod render;
 
 use anyhow::{Context, Result, bail};
-use config::Config;
+use touchbar_daemon::{config::{self, Config}, render::{self, Icons, Slot}};
 use evdev::KeyCode;
-use render::{Icons, Slot};
 use std::{
     fs,
     os::fd::AsRawFd,

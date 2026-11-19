@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Oma Touchbar
+Comment=Customise the Touch Bar: buttons, groups and layers
+Exec=touchbar-settings
+Icon=preferences-desktop-keyboard
+Categories=Settings;HardwareSettings;GTK;
+Keywords=touchbar;touch bar;function row;macbook;t2;

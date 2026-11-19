@@ -1,17 +1,3 @@
-[package]
-name = "touchbar-daemon"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-anyhow = "1.0.104"
-cairo-rs = { version = "0.22", features = ["png"] }
-chrono = "0.4.45"
-drm = "0.14"
-evdev = "0.13.2"
-libc = "0.2.191"
-pango = "0.22"
-pangocairo = "0.22"
-resvg = "0.50.0"
-serde = { version = "1.0.229", features = ["derive"] }
-toml = "1.2.1"
+[workspace]
+resolver = "3"
+members = ["daemon", "settings"]
