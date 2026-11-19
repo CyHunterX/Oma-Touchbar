@@ -1,0 +1,4 @@
+# Keep the Touch Bar's screen and touch surface away from the desktop
+# session: touchbar-daemon drives them on its own seat.
+SUBSYSTEM=="drm", KERNEL=="card*", DRIVERS=="appletbdrm", TAG-="master-of-seat", ENV{ID_SEAT}="seat-touchbar"
+SUBSYSTEM=="input", ATTRS{name}=="*Touch Bar*", ENV{ID_SEAT}="seat-touchbar"

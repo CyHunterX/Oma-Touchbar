@@ -1,0 +1,78 @@
+# touchbar-daemon configuration
+#
+# Copy to /etc/touchbar-daemon/config.toml and edit. The daemon reloads it
+# automatically when it changes.
+
+[general]
+default_layer = "media"     # layer shown normally
+fn_layer = "function"       # layer shown while Fn is held ("" to disable)
+outlines = true             # draw a background behind each button
+font = "Sans Bold"
+font_size = 20              # pixels
+icon_size = 30              # pixels
+dim_after = 30              # seconds without a touch before dimming (0 = never)
+off_after = 60              # seconds without a touch before turning off (0 = never)
+collapse_after = 15         # seconds before an opened layer closes again (0 = never)
+esc_button = false          # virtual Esc key, for models without a physical one
+flip_touch = false          # set to true if touches land on the mirrored button
+flip_display = false        # set to true if the picture is upside down
+
+# Each [[layer]] is a named row of buttons. Button fields:
+#
+#   label   = "text"                      text to show
+#   icon    = "name" or "/path/file.svg"  an icon-theme name or a file
+#   clock   = "12h" | "24h" | "%H:%M"     a clock (strftime format allowed)
+#   battery = "percent" | "icon" | "both" battery level
+#   key     = "VolumeUp" or ["LeftCtrl", "C"]   key or combo to press
+#   open    = "layer"     expand that layer, with a back button to return
+#   switch  = "layer"     replace the current layer with that one
+#   width   = 2           how many button spaces it takes up
+#   tint    = false       draw the icon in its own colours instead of white
+#
+# A button with none of these is an empty spacer.
+# Key names are kernel key names without KEY_, in any case: VolumeUp, F1,
+# LeftCtrl, PlayPause, BrightnessDown, KbdIllumUp, ...
+
+[[layer]]
+name = "media"
+buttons = [
+    { icon = "display-brightness-symbolic", label = "…", open = "brightness" },
+    { icon = "microphone-disabled-symbolic", key = "MicMute" },
+    { icon = "system-search-symbolic", key = "Search" },
+    { icon = "media-skip-backward-symbolic", key = "PreviousSong" },
+    { icon = "media-playback-start-symbolic", key = "PlayPause" },
+    { icon = "media-skip-forward-symbolic", key = "NextSong" },
+    { icon = "audio-volume-muted-symbolic", key = "Mute" },
+    { icon = "audio-volume-low-symbolic", key = "VolumeDown" },
+    { icon = "audio-volume-high-symbolic", key = "VolumeUp" },
+    { width = 1 },
+    { clock = "24h", width = 3 },
+    { battery = "both", width = 2 },
+]
+
+# Opened from the first button of the media layer.
+[[layer]]
+name = "brightness"
+buttons = [
+    { icon = "display-brightness-symbolic", label = "−", key = "BrightnessDown" },
+    { icon = "display-brightness-symbolic", label = "+", key = "BrightnessUp" },
+    { icon = "keyboard-brightness-symbolic", label = "−", key = "KbdIllumDown" },
+    { icon = "keyboard-brightness-symbolic", label = "+", key = "KbdIllumUp" },
+]
+
+[[layer]]
+name = "function"
+buttons = [
+    { label = "F1", key = "F1" },
+    { label = "F2", key = "F2" },
+    { label = "F3", key = "F3" },
+    { label = "F4", key = "F4" },
+    { label = "F5", key = "F5" },
+    { label = "F6", key = "F6" },
+    { label = "F7", key = "F7" },
+    { label = "F8", key = "F8" },
+    { label = "F9", key = "F9" },
+    { label = "F10", key = "F10" },
+    { label = "F11", key = "F11" },
+    { label = "F12", key = "F12" },
+]

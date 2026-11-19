@@ -1,0 +1,12 @@
+[Unit]
+Description=Touch Bar daemon with expandable button groups
+Conflicts=tiny-dfr.service
+After=systemd-udevd.service systemd-logind.service
+
+[Service]
+ExecStart=/usr/bin/touchbar-daemon
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
